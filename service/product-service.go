@@ -1,10 +1,11 @@
 package service
 
 import (
-	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/mashingan/smapping"
 	"github.com/ydhnwb/golang_api/dto"
 	"github.com/ydhnwb/golang_api/entity"
 	"github.com/ydhnwb/golang_api/repository"
@@ -12,8 +13,8 @@ import (
 
 type ProductService interface {
 	GetAllProducts(info dto.AllDataDTO) ([]entity.Product, int64)
-	InsertProductsFromExcel(rows [][]string) []entity.Product
-	SaveProduct(entity.Product) (entity.Product, error)
+	InsertProductsFromExcel(rows [][]string) ([]entity.Product, map[string]string)
+	SaveProduct(dto.ProductDTO) (entity.Product, error)
 	GetProductByID(id string, myID int) entity.Product
 	DeleteProducts(info dto.DeleteIDs) ([]entity.Product, int64)
 }
@@ -32,11 +33,17 @@ func (service productService) GetAllProducts(info dto.AllDataDTO) ([]entity.Prod
 	return service.productRepository.All(info)
 }
 
-func (service productService) InsertProductsFromExcel(rows [][]string) []entity.Product {
+func (service productService) InsertProductsFromExcel(rows [][]string) ([]entity.Product, map[string]string) {
 	var products []entity.Product
+	var names map[string]string = map[string]string{}
 	for _, row := range rows {
 		vintage, _ := strconv.Atoi(row[11])
 		number_of_bottles, _ := strconv.Atoi(row[15])
+		var image_url string = ""
+		if row[18] != "" {
+			names[row[18]] = strconv.FormatInt(time.Now().Unix(), 10) + "_" + row[18]
+			image_url = "public/images/" + names[row[18]]
+		}
 		product := entity.Product{
 			ID:                uuid.NewString(),
 			Name:              row[0],
@@ -57,18 +64,23 @@ func (service productService) InsertProductsFromExcel(rows [][]string) []entity.
 			Number_Of_Bottles: number_of_bottles,
 			Bottle_Code:       row[16],
 			Cask_Strength:     row[17],
+			ImageUrl:          image_url,
 		}
 		products = append(products, product)
-		fmt.Println("age : " + row[1])
 	}
-	return service.productRepository.InsertProducts(products)
+	return service.productRepository.InsertProducts(products), names
 }
 
-func (service productService) SaveProduct(product entity.Product) (entity.Product, error) {
-	if product.ID == "" {
-		product.ID = uuid.NewString()
+func (service productService) SaveProduct(product dto.ProductDTO) (entity.Product, error) {
+	var productToSave entity.Product
+	err := smapping.FillStruct(&productToSave, smapping.MapFields(&product))
+	if err != nil {
+		return entity.Product{}, err
 	}
-	return service.productRepository.SaveProduct(product)
+	if product.ID == "" {
+		productToSave.ID = uuid.NewString()
+	}
+	return service.productRepository.SaveProduct(productToSave)
 }
 
 func (service productService) GetProductByID(id string, myID int) entity.Product {

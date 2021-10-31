@@ -8,10 +8,12 @@ import (
 	"github.com/ydhnwb/golang_api/dto"
 	"github.com/ydhnwb/golang_api/helper"
 	"github.com/ydhnwb/golang_api/service"
+	"github.com/ydhnwb/golang_api/utils"
 )
 
 //UserController is a ....
 type UserController interface {
+	Create(context *gin.Context)
 	Update(context *gin.Context)
 	Profile(context *gin.Context)
 	AllUsers(context *gin.Context)
@@ -21,22 +23,42 @@ type UserController interface {
 type userController struct {
 	userService service.UserService
 	jwtService  service.JWTService
+	authService service.AuthService
 }
 
 //NewUserController is creating anew instance of UserControlller
-func NewUserController(userService service.UserService, jwtService service.JWTService) UserController {
+func NewUserController(userService service.UserService, jwtService service.JWTService, authService service.AuthService) UserController {
 	return &userController{
 		userService: userService,
 		jwtService:  jwtService,
+		authService: authService,
 	}
+}
+
+func (c *userController) Create(context *gin.Context) {
+	var user dto.RegisterDTO
+	errDTO := context.ShouldBind(&user)
+	if errDTO != nil {
+		utils.SendError(errDTO, context)
+		return
+	}
+	created, err := c.authService.CreateUser(user)
+	if err != nil {
+		utils.SendError(err, context)
+		return
+	}
+	data := map[string]interface{}{
+		"user": created,
+	}
+	res := helper.BuildResponse(true, "OK!", data)
+	context.JSON(http.StatusOK, res)
 }
 
 func (c *userController) Update(context *gin.Context) {
 	var user dto.AdminDTO
 	errDTO := context.ShouldBind(&user)
 	if errDTO != nil {
-		res := helper.BuildErrorResponse("Failed to process request", errDTO.Error(), helper.EmptyObj{})
-		context.AbortWithStatusJSON(http.StatusBadRequest, res)
+		utils.SendError(errDTO, context)
 		return
 	}
 	u := c.userService.Update(user)

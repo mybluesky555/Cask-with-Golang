@@ -49,7 +49,6 @@ func (db *userConnection) UpdateUser(user entity.User) entity.User {
 		user.Password = tempUser.Password
 		db.connection.Omit("password").Save(&user)
 	}
-
 	return user
 }
 

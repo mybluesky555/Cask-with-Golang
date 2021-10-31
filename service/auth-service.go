@@ -13,9 +13,10 @@ import (
 //AuthService is a contract about something that this service can do
 type AuthService interface {
 	VerifyCredential(email string, password string, isAdmin bool) interface{}
-	CreateUser(user dto.RegisterDTO) entity.User
+	CreateUser(user dto.RegisterDTO) (entity.User, error)
 	FindByEmail(email string) entity.User
 	IsDuplicateEmail(email string) bool
+	CheckAdminAndActive(userID string) int
 }
 
 type authService struct {
@@ -43,14 +44,15 @@ func (service *authService) VerifyCredential(email string, password string, isAd
 	return 3 // Wrong UserName
 }
 
-func (service *authService) CreateUser(user dto.RegisterDTO) entity.User {
+func (service *authService) CreateUser(user dto.RegisterDTO) (entity.User, error) {
 	userToCreate := entity.User{}
 	err := smapping.FillStruct(&userToCreate, smapping.MapFields(&user))
 	if err != nil {
-		log.Fatalf("Failed map %v", err)
+		log.Fatalf("Failed map %v", err.Error())
+		return userToCreate, err
 	}
 	res := service.userRepository.InsertUser(userToCreate)
-	return res
+	return res, nil
 }
 
 func (service *authService) FindByEmail(email string) entity.User {
@@ -70,4 +72,17 @@ func comparePassword(hashedPwd string, plainPassword []byte) bool {
 		return false
 	}
 	return true
+}
+
+func (service *authService) CheckAdminAndActive(userID string) int {
+	user := service.userRepository.ProfileUser(userID)
+	if !user.Active {
+		return 1 //Inactive
+	} else {
+		if user.IsAdmin {
+			return 0 // Admin & Active
+		} else {
+			return 2 // User & Active
+		}
+	}
 }

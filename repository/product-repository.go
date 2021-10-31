@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"os"
+
 	"github.com/ydhnwb/golang_api/dto"
 	"github.com/ydhnwb/golang_api/entity"
 	"gorm.io/gorm"
@@ -64,9 +66,11 @@ func (db *productConnection) GetProductByID(id string) entity.Product {
 }
 
 func (db *productConnection) DeleteProducts(info dto.DeleteIDs) bool {
-	result := db.connection.Delete(&entity.Product{}, info.IDs)
-	if result.Error != nil {
-		return false
+	var toDelete []entity.Product
+	db.connection.Find(&toDelete, info.IDs)
+	for i := 0; i < len(toDelete); i++ {
+		os.Remove(toDelete[i].ImageUrl)
 	}
-	return true
+	result := db.connection.Delete(&entity.Product{}, info.IDs)
+	return result.Error == nil
 }

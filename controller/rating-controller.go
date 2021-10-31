@@ -61,7 +61,7 @@ func (c *ratingController) Insert(context *gin.Context) {
 		context.SaveUploadedFile(file, newFileName)
 		ratingCreateDTO.Image_Url = newFileName
 		userID := context.GetString("userID")
-		convertedUserID, err := strconv.ParseUint(userID, 10, 64)
+		convertedUserID, err := strconv.Atoi(userID)
 		if err == nil {
 			ratingCreateDTO.UserID = convertedUserID
 		}

@@ -8,12 +8,15 @@ type RatingCreateDTO struct {
 	Comment   string                `form:"comment"`
 	Rating    float32               `form:"rating" binding:"required"`
 	Service   string                `form:"service" binding:"required"`
-	Location  string                `form:"location" binding:"required"`
 	Flavor    string                `form:"flavor" binding:"required"`
+	Country   string                `form:"country" binding:"required"`
+	State     string                `form:"state" binding:"required"`
+	City      string                `form:"city" binding:"required"`
+	ZipCode   string                `form:"zipcode" binding:"required"`
 	Image     *multipart.FileHeader `form:"image"`
 	Image_Url string                `form:"-"`
 	ProductID string                `form:"product_id" binding:"required"`
-	UserID    uint64                `form:"-"`
+	UserID    int                   `form:"-"`
 }
 
 type AllRatingsDTO struct {

@@ -26,9 +26,8 @@ type Product struct {
 	YourRatingCount   int      `json:"your_rating_count"`
 	AverageRating     float32  `json:"average_rating"`
 	YourAverageRating float32  `json:"your_average_rating"`
+	ImageUrl          string   `gorm:"type:string" json:"image_url"`
 	Ratings           []Rating `gorm:"foreignKey:ProductID" json:"ratings,omitempty"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
-
-	//Product : Rating one-to-many relationship
 }

@@ -2,15 +2,16 @@ package controller
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
 	"github.com/ydhnwb/golang_api/dto"
-	"github.com/ydhnwb/golang_api/entity"
 	"github.com/ydhnwb/golang_api/helper"
 	"github.com/ydhnwb/golang_api/service"
+	"github.com/ydhnwb/golang_api/utils"
 )
 
 type ProductController interface {
@@ -31,6 +32,7 @@ func NewProductController(service service.ProductService) ProductController {
 	}
 }
 
+// Admin & User
 func (c *productController) GetAllProducts(context *gin.Context) {
 	var info dto.AllDataDTO
 	errDTO := context.ShouldBind(&info)
@@ -48,6 +50,7 @@ func (c *productController) GetAllProducts(context *gin.Context) {
 	context.JSON(http.StatusOK, res)
 }
 
+//Admin
 func (c *productController) ImportExcel(context *gin.Context) {
 	var dto dto.ProductImport
 	errDTO := context.ShouldBind(&dto)
@@ -56,9 +59,13 @@ func (c *productController) ImportExcel(context *gin.Context) {
 		context.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
-	excel, _ := context.FormFile("excel_file")
+	excel := dto.ExcelFile
 	newFileName := "public/excel/" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + excel.Filename
 	context.SaveUploadedFile(excel, newFileName)
+	zip := dto.ZipFile
+	newZipName := "public/tmp/" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + zip.Filename
+	context.SaveUploadedFile(zip, newZipName)
+
 	f, err := excelize.OpenFile(newFileName)
 	if err != nil {
 		res := helper.BuildErrorResponse("Failed to Open the Excel File", errDTO.Error(), helper.EmptyObj{})
@@ -72,7 +79,9 @@ func (c *productController) ImportExcel(context *gin.Context) {
 		return
 	}
 	rows = rows[1:]
-	inserted := c.service.InsertProductsFromExcel(rows)
+	inserted, names := c.service.InsertProductsFromExcel(rows)
+	utils.Unzip(newZipName, names)
+	os.Remove(newFileName)
 	data := map[string]interface{}{
 		"products": inserted,
 		"count":    len(inserted),
@@ -82,16 +91,23 @@ func (c *productController) ImportExcel(context *gin.Context) {
 }
 
 func (c *productController) SaveProduct(context *gin.Context) {
-	var product entity.Product
+	var product dto.ProductDTO
 	err := context.ShouldBind(&product)
 	if err != nil {
 		res := helper.BuildErrorResponse("Failed to process request", err.Error(), helper.EmptyObj{})
 		context.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}
+	file, errFile := context.FormFile("image")
+	if errFile == nil { // File Exists
+		os.Remove("public/images/" + product.ImageUrl)
+		newFileName := "public/images/" + strconv.FormatInt(time.Now().Unix(), 10) + "_" + file.Filename
+		context.SaveUploadedFile(file, newFileName)
+		product.ImageUrl = newFileName
+	}
 	inserted, err := c.service.SaveProduct(product)
 	if err != nil {
-		res := helper.BuildErrorResponse("Failed to Open the Excel File", err.Error(), helper.EmptyObj{})
+		res := helper.BuildErrorResponse("Failed to Save", err.Error(), helper.EmptyObj{})
 		context.AbortWithStatusJSON(http.StatusBadRequest, res)
 		return
 	}

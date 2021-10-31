@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/ydhnwb/golang_api/entity"
 	"github.com/ydhnwb/golang_api/helper"
 	"github.com/ydhnwb/golang_api/service"
+	"github.com/ydhnwb/golang_api/utils"
 )
 
 //AuthController interface is a contract what this controller can do
@@ -62,6 +64,7 @@ func (c *authController) Login(ctx *gin.Context) {
 func (c *authController) Register(ctx *gin.Context) {
 	var registerDTO dto.RegisterDTO
 	errDTO := ctx.ShouldBind(&registerDTO)
+	fmt.Println(registerDTO)
 	if errDTO != nil {
 		response := helper.BuildErrorResponse("Failed to process request", errDTO.Error(), helper.EmptyObj{})
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, response)
@@ -72,7 +75,11 @@ func (c *authController) Register(ctx *gin.Context) {
 		response := helper.BuildErrorResponse("Failed to process request", "Duplicate email", helper.EmptyObj{})
 		ctx.JSON(http.StatusConflict, response)
 	} else {
-		createdUser := c.authService.CreateUser(registerDTO)
+		createdUser, err := c.authService.CreateUser(registerDTO)
+		if err != nil {
+			utils.SendError(err, ctx)
+			return
+		}
 		data := map[string]interface{}{
 			"user": createdUser,
 		}

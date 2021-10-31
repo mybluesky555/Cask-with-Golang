@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/ydhnwb/golang_api/config"
 	"github.com/ydhnwb/golang_api/controller"
+	"github.com/ydhnwb/golang_api/entity"
 	"github.com/ydhnwb/golang_api/middleware"
 	"github.com/ydhnwb/golang_api/repository"
 	"github.com/ydhnwb/golang_api/service"
@@ -22,13 +25,15 @@ var (
 	ratingService     service.RatingService        = service.NewRatingService(ratingRepository)
 	productService    service.ProductService       = service.NewProductService(productRepository)
 	authController    controller.AuthController    = controller.NewAuthController(authService, jwtService)
-	userController    controller.UserController    = controller.NewUserController(userService, jwtService)
+	userController    controller.UserController    = controller.NewUserController(userService, jwtService, authService)
 	ratingController  controller.RatingController  = controller.NewRatingController(ratingService)
 	productController controller.ProductController = controller.NewProductController(productService)
 )
 
 func main() {
 	defer config.CloseDatabaseConnection(db)
+	fmt.Println("Running")
+	db.AutoMigrate(&entity.Rating{})
 	r := gin.Default()
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
@@ -36,7 +41,6 @@ func main() {
 	config.AddAllowHeaders("Content-Type")
 	config.AddAllowHeaders("Authorization")
 	r.Use(cors.New(config))
-	// r.Use(cors.Default())
 	//Serving Static Files Like Images.
 	r.Static("/public/images", "./public/images")
 	authRoutes := r.Group("api/auth")
@@ -45,28 +49,42 @@ func main() {
 		authRoutes.POST("/register", authController.Register)
 	}
 
-	userRoutes := r.Group("api/user", middleware.AuthorizeJWT(jwtService))
+	userRoutes := r.Group("api/user", middleware.AuthorizeUser(jwtService, authService))
 	{
 		userRoutes.GET("/profile", userController.Profile)
 		userRoutes.PUT("/profile", userController.Update)
-		userRoutes.POST("/all", userController.AllUsers)
-		userRoutes.POST("/update", userController.Update)
-		userRoutes.DELETE("/delete/:id", userController.DeleteUser)
+
 	}
 
-	ratingRoutes := r.Group("api/rating", middleware.AuthorizeJWT(jwtService))
+	userAdminRoutes := r.Group("api/user", middleware.AuthorizeAdmin(jwtService, authService))
 	{
-		ratingRoutes.POST("/all", ratingController.AllRatings)
+
+		userAdminRoutes.POST("/all", userController.AllUsers)
+		userAdminRoutes.DELETE("/delete/:id", userController.DeleteUser)
+		userAdminRoutes.POST("/update", userController.Update)
+		userAdminRoutes.POST("/create", authController.Register)
+	}
+
+	ratingRoutes := r.Group("api/rating", middleware.AuthorizeUser(jwtService, authService))
+	{
 		ratingRoutes.POST("/", ratingController.Insert)
 	}
 
-	productRoutes := r.Group("api/product", middleware.AuthorizeJWT(jwtService))
+	ratingAdminRoutes := r.Group("api/rating", middleware.AuthorizeAdmin(jwtService, authService))
+	{
+		ratingAdminRoutes.POST("/all", ratingController.AllRatings)
+	}
+
+	productRoutes := r.Group("api/product", middleware.AuthorizeUser(jwtService, authService))
 	{
 		productRoutes.POST("/all", productController.GetAllProducts)
-		productRoutes.POST("/import", productController.ImportExcel)
-		productRoutes.POST("/save", productController.SaveProduct)
 		productRoutes.GET("/:id", productController.GetProductByID)
-		productRoutes.POST("/delete", productController.DeleteProducts)
+	}
+	productAdminRoutes := r.Group("api/product", middleware.AuthorizeAdmin(jwtService, authService))
+	{
+		productAdminRoutes.POST("/import", productController.ImportExcel)
+		productAdminRoutes.POST("/delete", productController.DeleteProducts)
+		productAdminRoutes.POST("/save", productController.SaveProduct)
 	}
 	r.Run()
 }
